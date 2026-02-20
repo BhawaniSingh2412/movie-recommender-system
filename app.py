@@ -4,6 +4,7 @@ import requests
 import json
 import os
 from datetime import datetime
+from thefuzz import fuzz, process
 
 # ─── Page Config ───
 st.set_page_config(
@@ -414,18 +415,29 @@ movie_list = sorted(movies['title'].values.tolist())
 
 col_l, col_c, col_r = st.columns([1, 3, 1])
 with col_c:
-    search_query = st.text_input("🔍 Search for a movie", placeholder="Type a movie name...", key="search")
+    search_query = st.text_input("🔍 Search for a movie", placeholder="Type a movie name... (fuzzy search enabled)", key="search")
 
     if search_query:
         q = search_query.lower().strip()
+        # Layer 1: Exact & substring matches
         exact = [m for m in movie_list if m.lower() == q]
         starts = [m for m in movie_list if m.lower().startswith(q) and m.lower() != q]
         contains = [m for m in movie_list if q in m.lower() and not m.lower().startswith(q)]
-        filtered = exact + starts + contains
+        substring_matches = exact + starts + contains
+
+        # Layer 2: Fuzzy matches (handles typos like "intersteller", "dar knight")
+        fuzzy_results = process.extract(q, movie_list, scorer=fuzz.token_set_ratio, limit=15)
+        fuzzy_matches = [r[0] for r in fuzzy_results if r[1] >= 65 and r[0] not in substring_matches]
+
+        filtered = substring_matches + fuzzy_matches
         if filtered:
-            selected_movie = st.selectbox(f"🎯 {len(filtered)} movie(s) found", filtered, index=0)
+            # Show match type
+            label = f"🎯 {len(filtered)} movie(s) found"
+            if not substring_matches and fuzzy_matches:
+                label += " (fuzzy match)"
+            selected_movie = st.selectbox(label, filtered, index=0)
         else:
-            st.warning(f"❌ No movies matching **\"{search_query}\"**")
+            st.warning(f"❌ No movies matching **\"{search_query}\"** — try a different spelling")
             selected_movie = None
     else:
         selected_movie = st.selectbox("Browse catalog", movie_list, index=None, placeholder="Or browse all movies...")
