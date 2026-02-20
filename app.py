@@ -325,16 +325,42 @@ st.markdown(f"""
 """, unsafe_allow_html=True)
 
 # ─── Search Section ───
-movie_list = movies['title'].values
+movie_list = sorted(movies['title'].values.tolist())
 
 col_left, col_center, col_right = st.columns([1, 3, 1])
 with col_center:
-    selected_movie = st.selectbox(
+    search_query = st.text_input(
         "🔍  Search for a movie",
-        movie_list,
-        index=None,
         placeholder="Type a movie name... e.g. Inception, Titanic, Avatar",
+        key="movie_search",
     )
+
+    # Filter movies based on search query
+    if search_query:
+        query_lower = search_query.lower().strip()
+        # Separate exact, starts-with, and contains matches for smart ordering
+        exact = [m for m in movie_list if m.lower() == query_lower]
+        starts_with = [m for m in movie_list if m.lower().startswith(query_lower) and m.lower() != query_lower]
+        contains = [m for m in movie_list if query_lower in m.lower() and not m.lower().startswith(query_lower)]
+        filtered_movies = exact + starts_with + contains
+
+        if filtered_movies:
+            selected_movie = st.selectbox(
+                f"🎯  {len(filtered_movies)} movie(s) found",
+                filtered_movies,
+                index=0,
+                label_visibility="visible",
+            )
+        else:
+            st.warning(f"❌ No movies found matching **\"{search_query}\"**. Try a different search.")
+            selected_movie = None
+    else:
+        selected_movie = st.selectbox(
+            "Browse all movies",
+            movie_list,
+            index=None,
+            placeholder="Or browse the full catalog...",
+        )
 
     show_btn = st.button("✨  Get Recommendations", use_container_width=True)
 
